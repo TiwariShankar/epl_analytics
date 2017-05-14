@@ -9,12 +9,6 @@ from utility import *
 from sklearn.decomposition import PCA
 import numpy as np
 
-# eigenvectors with the lowest eigenvalues bear the least information about the
-# distribution of the data, and those are the ones we want to drop.
-# The eigenvectors (principal components) determine the directions of the new feature space, 
-# and the eigenvalues determine their magnitude. In other words, the eigenvalues explain the 
-# variance of the data along the new feature axes.
-
 
 def perform_pca(df):
         matplotlib.style.use('ggplot')

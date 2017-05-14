@@ -23,7 +23,7 @@ def perform_kmeans(X_reduced, df, mergedf, feature_name):
     else:
         plot_kmeans, x_data, max_index = calscore(X_reduced, 10)
 
-    # plotsil(x_data, plot_kmeans, 'kmeans.png')
+    plotsil(x_data, plot_kmeans, 'kmeans.png')
     # fit the model and calculates score
     if X_reduced.shape[0] > 10000:
         # for more than 10000 rows
@@ -67,9 +67,9 @@ def perform_kmeans(X_reduced, df, mergedf, feature_name):
     col_map = dict(zip(set(labels), colors))  # key as labels and value as colors
     label_color = [col_map[l] for l in labels]
 
-    # plotkmeans(X_reduced, label_color, centroids, 'clusters.png', max_index, labels, col_map)
+    plotkmeans(X_reduced, label_color, centroids, 'clusters.png', max_index, labels, col_map)
     # Top 30 words in each cluster for wordcloud
-    # generatewordcloud(max_index, order_centroids, feature_name)
+    generatewordcloud(max_index, order_centroids, feature_name)
 
     seconds = (time.time() - start_time_kmeans)
     logging.info("KMeans Time:{}".format(str(timedelta(seconds=seconds))))
