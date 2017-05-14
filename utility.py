@@ -79,6 +79,17 @@ ver_count = []
 matplotlib.style.use('ggplot')
 
 
+def getMatches(posts):
+    cur = posts.find({}, {'match': 1, '_id': 0})
+    records = list(cur)
+    matches = []
+    for row in records:
+        if row['match'] not in matches:
+            matches.append(row['match'])
+    logging.info("\nMatches: {}".format(matches))
+    logging.debug("\nMatches: {}".format(matches))
+
+
 def getallmatchtweets(posts):
     start_time = time.time()
     plot_match_tweets = {}
@@ -105,11 +116,15 @@ def getallmatchtweets(posts):
     plt.close()
 
 
-def gettweets(posts, match, startDate, endDate, seq):
+def gettweets(posts, match, startDate, endDate):
     # cursor = posts.find({'match': match}, {'_id': 0, 'date': 1})
     cursor = posts.find({'$and': [{'match': match},
-                                  {'date': {'$gte': startDate, '$lt': endDate}}]},
+                                  {'date': {'$gte': startDate, '$lte': endDate}}]},
                                   {'date': 1, '_id': 0})
+
+    if cursor.count() == 0:
+        logging.info("Tweets doesn't exist for the given match")
+        sys.exit(1)
     dict_date = {}
     for rec in cursor:
         x = calendar.timegm(rec['date'].utctimetuple())
@@ -127,99 +142,14 @@ def gettweets(posts, match, startDate, endDate, seq):
     ax.plot(df_object['date'], df_object['count'])
     plt.ylabel('Count')
     plt.xlabel('Date')
-    if seq == 1:
-        plt.savefig('Tweets Count_1.png', dpi=800)
-    else:
-        plt.savefig('Tweets Count_2.png', dpi=800)
+    plt.savefig('Tweets Count.png', dpi=800)
     plt.close()
-
-
-def plotpca(exp_var, figname):
-    plt.plot(exp_var)
-    plt.xlabel('number of components')
-    plt.ylabel('cumulative explained variance')
-    plt.title("PCA", y=1.03)
-    plt.savefig(figname, dpi=800)
-    plt.close()
-
-
-def plotsil(x_data, plot_kmeans, figname):
-    f, ax = plt.subplots()
-    ax.plot(x_data, plot_kmeans)
-    plt.ylabel("Silouette")
-    plt.xlabel("k")
-    plt.title("Silouette for K-means cell's behaviour", y=1.03)
-    plt.savefig(figname, dpi=800)
-    plt.close()
-
-
-def calscore(X_reduced, random_state):
-    plot_kmeans = []
-    x_data = []
-    for num in range(5, 25):
-        kmeans = KMeans(
-            init='k-means++',
-            n_clusters=num,
-            random_state=random_state)
-        kmeans.fit(X_reduced)
-
-        labels = kmeans.labels_
-        plot_kmeans.append(metrics.silhouette_score(X_reduced, labels))
-        x_data.append(num)
-        logging.info("cluster no:{}, silhouetter score:{}".format(num, metrics.silhouette_score(X_reduced, labels)))
-    return plot_kmeans, x_data
-
-
-def fitkmeans(df, X_reduced, n_clusters, random_state, sample_size):
-    kmeans_model = KMeans(
-        init='k-means++',
-        n_clusters=n_clusters,
-        random_state=random_state).fit(X_reduced)
-    labels = kmeans_model.labels_
-    centroids = kmeans_model.cluster_centers_
-    df['cluster_id'] = labels
-    logging.info("\033[92m")
-    if sample_size != 0:
-        logging.info(
-            "\nSilhouette Coefficient:{}".format(
-                metrics.silhouette_score(
-                    X_reduced,
-                    labels,
-                    sample_size=sample_size)))
-    else:
-        logging.info(
-            "\nSilhouette Coefficient:{}".format(
-                metrics.silhouette_score(
-                    X_reduced,
-                    labels)))
-    logging.info("\033[0m")
-    return df, labels, centroids, kmeans_model
-
-
-def plotkmeans(X_reduced, label_color, centroids, figname, num_of_cluster):
-    plt.scatter(X_reduced[:, 0], X_reduced[:, 1], c=label_color)
-    plt.hold(True)
-    plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=100.0, color='black')
-    plt.title('K-means clusters the dataset into (%d) clusters' % num_of_cluster, y=1.03)
-    plt.savefig(figname, dpi=800)
-    plt.close()
-
-
-def getMatches(posts):
-    cur = posts.find({}, {'match': 1, '_id': 0})
-    records = list(cur)
-    matches = []
-    for row in records:
-        if row['match'] not in matches:
-            matches.append(row['match'])
-    logging.info("\nMatches: {}".format(matches))
-    logging.debug("\nMatches: {}".format(matches))
 
 
 def getrecords(posts, startDate, endDate, match):
-    cursor_before = posts.find({'$and': [{'match': match},
+    cursor_records = posts.find({'$and': [{'match': match},
                                          {"date": {"$gte": startDate,
-                                                   "$lt": endDate}}]},
+                                                   "$lte": endDate}}]},
                                {'doc': 1,
                                 'hashtag_count': 1,
                                 'mention_count': 1,
@@ -249,204 +179,9 @@ def getrecords(posts, startDate, endDate, match):
     #                             'favorite_count': 1,
     #                             'date': 1,
     #                             '_id': 1})
-    return cursor_before
-
-
-def getstopwords(match, posts, startDate, endDate, seq):
-    cursor_records = posts.find({'$and': [{'match': match},
-                                          {"date": {"$gte": startDate,
-                                                    "$lt": endDate}}]},
-                                {'tweetText': 1,
-                                 '_id': 0})
-    # cursor_records = posts.find({'$and': [{'$or': [{'match': match},
-    #                                                {'match': '#MUFC'},
-    #                                                {'match': '#AFC'}]},
-    #                                       {"date": {"$gte": startDate,
-    #                                                 "$lt": endDate}}]},
-    #                             {'tweetText': 1,
-    #                              '_id': 0})
-    done = set()
-    tweets = []
-    for d in cursor_records:
-        if isinstance(d['tweetText'], list):
-            d['tweetText'] = " ".join(d['tweetText'])
-        if d['tweetText'] not in done:
-            done.add(d['tweetText'])
-            tweets.append(d['tweetText'])
-    stopset = set(stopwords.words('english'))
-    prefixes = ('rt', '//', 'http', 'https', '\\', '#rt', ':')
-    stopwords_list = {}
-    for tweet in tweets:
-        token_split = tweet.split(' ')
-        # removes prefixes
-        tweet_tokenize = [token for token in token_split if not
-                          token.startswith(prefixes) and len(token) != 1]
-        # removes digit
-        tweet_tokenize = [x for x in tweet_tokenize if not any(
-            c.isdigit() for c in x)]
-        # Removes punctuation
-        tweet_tokenize = [
-            i for i in tweet_tokenize if i not in string.punctuation]
-        lmtzr = WordNetLemmatizer()
-        tweet_tokenize = [lmtzr.lemmatize(token) for token in tweet_tokenize]
-        for token in tweet_tokenize:
-            if token in stopset:
-                if token in stopwords_list:
-                    stopwords_list[token] += 1
-                else:
-                    stopwords_list[token] = 0
-    # Set up the axes and figure
-    stp_len = len(stopwords_list)
-    fig, ax = plt.subplots()
-    plt.bar(
-        range(
-            len(stopwords_list)),
-        stopwords_list.values())
-    plt.xticks(
-        range(
-            len(stopwords_list)),
-        list(stopwords_list.keys()),
-        rotation='vertical')
-    # Set the x-axis limit
-    ax.set_xlim(0, stp_len)
-    plt.setp(ax.get_xticklabels(), fontsize=4)
-    plt.title("Stop words", y=1.03)
-    if seq == 1:
-        plt.savefig('Stop_words_1.png', dpi=800)
-    else:
-        plt.savefig('Stop_words_2.png', dpi=800)
-    plt.close()
-
-
-def generatewordcloud(n_clusters, order_centroids, feature_name, seq):
-    for i in range(n_clusters):
-        word_cluster = []
-        logging.info("Cluster {}:".format(i))
-        logging.debug("Cluster {}:".format(i))
-        for ind in order_centroids[i, :50]:
-            logging.debug(feature_name[ind])
-            logging.info(feature_name[ind])
-            word_cluster.append(feature_name[ind])
-        logging.info("\n")
-        words = ' '.join(word_cluster)
-        wordcloud = WordCloud(
-            stopwords=STOPWORDS,
-            background_color='black',
-            margin=10,
-        ).generate(words)
-
-        base_dir_1 = '/Cluster_Epl/wordcloud/1/'
-        base_dir_2 = '/Cluster_Epl/wordcloud/2/'
-        if seq == 1:
-            plt.imshow(wordcloud)
-            plt.axis('off')
-            imgname = str(i) + '.png'
-            file_path = os.path.join(base_dir_1, imgname)
-            plt.title("Cluster: " + str(i), y=1.03)
-            plt.savefig(file_path, dpi=800)
-            plt.close()
-        if seq == 2:
-            plt.imshow(wordcloud)
-            plt.axis('off')
-            imgname = str(i) + '.png'
-            file_path = os.path.join(base_dir_2, imgname)
-            plt.title("Cluster: " + str(i), y=1.03)
-            plt.savefig(file_path, dpi=800)
-            plt.close()
-
-
-def gettophashtags(documents, match, seq):
-    toptags = {}
-    match = match.lower().strip()
-    if len(documents) > 0:
-        for tweet in documents:
-            tweet = tweet.split()
-            for word in tweet:
-                word = word.strip()
-                if word != match and word.startswith("#"):
-                    if word in toptags:
-                        toptags[word] += 1
-                    else:
-                        toptags[word] = 0
-        dict_filt_zeros = {k: v for k, v in toptags.items() if v != 0}
-        dict_top = dict(
-            sorted(
-                dict_filt_zeros.iteritems(),
-                key=operator.itemgetter(1),
-                reverse=True)[
-                :30])
-        dict_len = len(dict_top)
-        if seq == 1:
-            fig, ax = plt.subplots()
-            plt.bar(range(len(dict_top)), dict_top.values())
-            plt.xticks(
-                range(
-                    len(dict_top)), list(
-                    dict_top.keys()), rotation='vertical')
-            ax.set_xlim(0, dict_len)
-            plt.setp(ax.get_xticklabels(), fontsize=4)
-            plt.title("Top tags", y=1.03)
-            plt.savefig('Top_tags_1.png', dpi=800)
-            plt.close()
-        if seq == 2:
-            fig, ax = plt.subplots()
-            plt.bar(range(len(dict_top)), dict_top.values())
-            plt.xticks(
-                range(
-                    len(dict_top)), list(
-                    dict_top.keys()), rotation='vertical')
-            ax.set_xlim(0, dict_len)
-            plt.setp(ax.get_xticklabels(), fontsize=4)
-            plt.title("Top tags", y=1.03)
-            plt.savefig('Top_tags_2.png', dpi=800)
-            plt.close()
-
-        logging.debug(
-            "\n--------------------------------Top tags:-----------------------------------------")
-        logging.debug("\nTop tags: {}".format(toptags))
-
-
-def getclustercount(cid_tweets, clusterno, home, away):
-    nc_h = nc_a = 0
-    for k, v in cid_tweets.items():
-        if k == clusterno:
-            for sent in v:
-                sent = sent.split()
-                if len([word for word in home if word in sent]) > 0:
-                    nc_h += 1
-                if len([word for word in away if word in sent]) > 0:
-                    nc_a += 1
-    return nc_h, nc_a
-
-
-def dictvecfeature(feature, featureName):
-    # This transformer turns lists of mappings (dict-like objects)
-    # of feature names to feature values into Numpy arrays
-    for count in feature:
-        if featureName == "bow_matrix_count":
-            addit_feature = {featureName: count}
-            bowmatrix_count.append(addit_feature)
-        elif featureName == "follower_count":
-            addit_feature = {featureName: count}
-            followercount_features.append(addit_feature)
-        elif featureName == "retweet_count":
-            addit_feature = {featureName: count}
-            retweetcount_features.append(addit_feature)
-        elif featureName == "hashtag_count":
-            addit_feature = {featureName: count}
-            hashtagcount_features.append(addit_feature)
-        elif featureName == "mention_count":
-            addit_feature = {featureName: count}
-            mentioncount_features.append(addit_feature)
-        elif featureName == "sentiment_pol":
-            addit_feature = {featureName: count}
-            pol_count.append(addit_feature)
-        elif featureName == "favorite_count":
-            addit_feature = {featureName: count}
-            fav_count.append(addit_feature)
-        elif featureName == "verify_count":
-            addit_feature = {featureName: count}
-            ver_count.append(addit_feature)
+    # print len(list(cursor_records))
+    # sys.exit(1)
+    return cursor_records
 
 
 def fetchdb(posts, match, startDate, endDate):
@@ -462,8 +197,8 @@ def fetchdb(posts, match, startDate, endDate):
     screen_name = []
     description = []
     cursor_records = getrecords(posts, startDate, endDate, match)
-    # beforeMatch = list(cursor_before)
     records = list(cursor_records)
+
     # keeps unique row and sequence
     done = set()
     result = []
@@ -619,6 +354,136 @@ def fetchdb(posts, match, startDate, endDate):
         screen_name, description
 
 
+def gettophashtags(documents, match):
+    toptags = {}
+    match = match.lower().strip()
+    if len(documents) > 0:
+        for tweet in documents:
+            tweet = tweet.split()
+            for word in tweet:
+                word = word.strip()
+                if word != match and word.startswith("#"):
+                    if word in toptags:
+                        toptags[word] += 1
+                    else:
+                        toptags[word] = 0
+        dict_filt_zeros = {k: v for k, v in toptags.items() if v != 0}
+        dict_top = dict(
+            sorted(
+                dict_filt_zeros.iteritems(),
+                key=operator.itemgetter(1),
+                reverse=True)[
+                :30])
+        dict_len = len(dict_top)
+        fig, ax = plt.subplots()
+        plt.bar(range(len(dict_top)), dict_top.values())
+        plt.xticks(
+            range(
+                len(dict_top)), list(
+                dict_top.keys()), rotation='vertical')
+        ax.set_xlim(0, dict_len)
+        plt.setp(ax.get_xticklabels(), fontsize=4)
+        plt.title("Top tags", y=1.03)
+        plt.savefig('Top_tags.png', dpi=800)
+        plt.close()
+        logging.debug(
+            "\n--------------------------------Top tags:-----------------------------------------")
+        logging.debug("\nTop tags: {}".format(toptags))
+
+
+def getstopwords(match, posts, startDate, endDate):
+    cursor_records = posts.find({'$and': [{'match': match},
+                                          {"date": {"$gte": startDate,
+                                                    "$lt": endDate}}]},
+                                {'tweetText': 1,
+                                 '_id': 0})
+    # cursor_records = posts.find({'$and': [{'$or': [{'match': match},
+    #                                                {'match': '#MUFC'},
+    #                                                {'match': '#AFC'}]},
+    #                                       {"date": {"$gte": startDate,
+    #                                                 "$lt": endDate}}]},
+    #                             {'tweetText': 1,
+    #                              '_id': 0})
+    done = set()
+    tweets = []
+    for d in cursor_records:
+        if isinstance(d['tweetText'], list):
+            d['tweetText'] = " ".join(d['tweetText'])
+        if d['tweetText'] not in done:
+            done.add(d['tweetText'])
+            tweets.append(d['tweetText'])
+    stopset = set(stopwords.words('english'))
+    prefixes = ('rt', '//', 'http', 'https', '\\', '#rt', ':')
+    stopwords_list = {}
+    for tweet in tweets:
+        token_split = tweet.split(' ')
+        # removes prefixes
+        tweet_tokenize = [token for token in token_split if not
+                          token.startswith(prefixes) and len(token) != 1]
+        # removes digit
+        tweet_tokenize = [x for x in tweet_tokenize if not any(
+            c.isdigit() for c in x)]
+        # Removes punctuation
+        tweet_tokenize = [
+            i for i in tweet_tokenize if i not in string.punctuation]
+        lmtzr = WordNetLemmatizer()
+        tweet_tokenize = [lmtzr.lemmatize(token) for token in tweet_tokenize]
+        for token in tweet_tokenize:
+            if token in stopset:
+                if token in stopwords_list:
+                    stopwords_list[token] += 1
+                else:
+                    stopwords_list[token] = 0
+    # Set up the axes and figure
+    stp_len = len(stopwords_list)
+    fig, ax = plt.subplots()
+    plt.bar(
+        range(
+            len(stopwords_list)),
+        stopwords_list.values())
+    plt.xticks(
+        range(
+            len(stopwords_list)),
+        list(stopwords_list.keys()),
+        rotation='vertical')
+    # Set the x-axis limit
+    ax.set_xlim(0, stp_len)
+    plt.setp(ax.get_xticklabels(), fontsize=4)
+    plt.title("Stop words", y=1.03)
+    plt.savefig('Stop_words.png', dpi=800)
+    plt.close()
+
+
+def dictvecfeature(feature, featureName):
+    # This transformer turns lists of mappings (dict-like objects)
+    # of feature names to feature values into Numpy arrays
+    for count in feature:
+        if featureName == "bow_matrix_count":
+            addit_feature = {featureName: count}
+            bowmatrix_count.append(addit_feature)
+        elif featureName == "follower_count":
+            addit_feature = {featureName: count}
+            followercount_features.append(addit_feature)
+        elif featureName == "retweet_count":
+            addit_feature = {featureName: count}
+            retweetcount_features.append(addit_feature)
+        elif featureName == "hashtag_count":
+            addit_feature = {featureName: count}
+            hashtagcount_features.append(addit_feature)
+        elif featureName == "mention_count":
+            addit_feature = {featureName: count}
+            mentioncount_features.append(addit_feature)
+        elif featureName == "sentiment_pol":
+            addit_feature = {featureName: count}
+            pol_count.append(addit_feature)
+        elif featureName == "favorite_count":
+            addit_feature = {featureName: count}
+            fav_count.append(addit_feature)
+        elif featureName == "verify_count":
+            addit_feature = {featureName: count}
+            ver_count.append(addit_feature)
+
+
 def get_features(index_id, documents, follower_count, retweet_count, hashtag_count, mention_count, sentiment_pol, favorite_count, verify_count, screen_name, description):
     logging.info(
         "\n--------------------------------Feature Info:---------------------------------------")
@@ -628,16 +493,17 @@ def get_features(index_id, documents, follower_count, retweet_count, hashtag_cou
 
     # min_df it is ignored. 0.2 here indicates 20 % . i.e. if a feature does
     # exist not in 20 % of the document, it will be discarded.
-    if len(documents) == 0:
-        sys.exit("No such match present")
+    if len(documents) == 0 or len(documents) <= 50:
+        logging.info("No such match present or few data for match")
+        return pd.DataFrame(), "", ""
     elif len(documents) > 5000:
-        max_features = 1000
+        # max_features = 1000
         countVec = CountVectorizer(min_df=0.005, stop_words='english')
     elif len(documents) < 500:
-        max_features = 50
+        # max_features = 50
         countVec = CountVectorizer(min_df=0.015, stop_words='english')
     else:
-        max_features = 300
+        # max_features = 300
         countVec = CountVectorizer(min_df=0.005, stop_words='english')
     # countVec = CountVectorizer(max_features=max_features, stop_words='english')
     bow_matrix = countVec.fit_transform(documents)
@@ -795,6 +661,133 @@ def get_features(index_id, documents, follower_count, retweet_count, hashtag_cou
     return df, mergedf, countVec.get_feature_names()
 
 
+def plotpca(exp_var, figname):
+    plt.plot(exp_var)
+    plt.xlabel('number of components')
+    plt.ylabel('cumulative explained variance')
+    plt.title("PCA", y=1.03)
+    plt.savefig(figname, dpi=800)
+    plt.close()
+
+
+def plotsil(x_data, plot_kmeans, figname):
+    f, ax = plt.subplots()
+    ax.plot(x_data, plot_kmeans)
+    plt.ylabel("Silouette")
+    plt.xlabel("k")
+    plt.title("Silouette for K-means cell's behaviour", y=1.03)
+    plt.savefig(figname, dpi=800)
+    plt.close()
+
+
+def calscore(X_reduced, random_state):
+    plot_kmeans = []
+    x_data = []
+    for num in range(5, 16):
+        kmeans = KMeans(
+            init='k-means++',
+            n_clusters=num,
+            random_state=random_state)
+        kmeans.fit(X_reduced)
+
+        labels = kmeans.labels_
+        plot_kmeans.append(metrics.silhouette_score(X_reduced, labels))
+        x_data.append(num)
+        logging.info("cluster no:{}, silhouetter score:{}".format(num, metrics.silhouette_score(X_reduced, labels)))
+    # Gets the max sil value and corresponding cluster no.
+    max_value = max(plot_kmeans)
+    max_index = plot_kmeans.index(max_value) + 5
+
+    return plot_kmeans, x_data, max_index
+
+
+def fitkmeans(df, X_reduced, n_clusters, random_state, sample_size):
+    # This initializes the centroids to be (generally) distant from each other, leading to provably better results than
+    # random initialization, as shown in the reference.
+    kmeans_model = KMeans(
+        init='k-means++',
+        n_clusters=n_clusters,
+        random_state=random_state).fit(X_reduced)
+    labels = kmeans_model.labels_
+    centroids = kmeans_model.cluster_centers_
+    logging.info("\033[92m")
+    if sample_size != 0:
+        logging.info(
+            "\nSilhouette Coefficient:{}".format(
+                metrics.silhouette_score(
+                    X_reduced,
+                    labels,
+                    sample_size=sample_size)))
+    else:
+        logging.info(
+            "\nSilhouette Coefficient:{}".format(
+                metrics.silhouette_score(
+                    X_reduced,
+                    labels)))
+    logging.info("\033[0m")
+    return df, labels, centroids, kmeans_model
+
+
+def plotkmeans(X_reduced, label_color, centroids, figname, num_of_cluster, labels, col_map):
+    plt.scatter(X_reduced[:, 0], X_reduced[:, 1], c=label_color)
+    plt.hold(True)
+    # plt.legend()
+    plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=100.0, color='black')
+    plt.title('K-means clusters the dataset into (%d) clusters' % num_of_cluster, y=1.03)
+    plt.savefig(figname, dpi=800)
+    plt.close()
+
+
+def generatewordcloud(n_clusters, order_centroids, feature_name):
+    for i in range(n_clusters):
+        word_cluster = []
+        logging.info("Cluster {}:".format(i))
+        logging.debug("Cluster {}:".format(i))
+        for ind in order_centroids[i, :50]:
+            logging.debug(feature_name[ind])
+            logging.info(feature_name[ind])
+            word_cluster.append(feature_name[ind])
+        logging.info("\n")
+        words = ' '.join(word_cluster)
+        wordcloud = WordCloud(
+            stopwords=STOPWORDS,
+            background_color='black',
+            margin=10,
+        ).generate(words)
+
+        base_dir_1 = '/Cluster_Epl/wordcloud/1/'
+        base_dir_2 = '/Cluster_Epl/wordcloud/2/'
+        plt.imshow(wordcloud)
+        plt.axis('off')
+        imgname = str(i) + '.png'
+        file_path = os.path.join(base_dir_1, imgname)
+        plt.title("Cluster: " + str(i), y=1.03)
+        plt.savefig(file_path, dpi=800)
+        plt.close()
+
+
+def getclustercount(cid_tweets, clusterno, home, away):
+    nc_h = nc_a = 0
+    for k, v in cid_tweets.items():
+        if k == clusterno:
+            for sent in v:
+                sent = sent.split()
+                if len([word for word in home if word in sent]) > 0:
+                    # logging.info("home tweet: {}".format(sent))
+                    # logging.info("words found in home tweet: {}".format([word for word in home if word in sent]))
+                    # logging.debug("home tweet: {}".format(sent))
+                    # logging.debug("words found in home tweet: {}".format([word for word in home if word in sent]))
+                    nc_h += 1
+                if len([word for word in away if word in sent]) > 0:
+                    # logging.info("home tweet: {}".format(sent))
+                    # logging.info("words found in home tweet: {}".format([word for word in home if word in sent]))
+                    # logging.debug("away tweet: {}".format(sent))
+                    # logging.debug("words found in away tweet: {}".format([word for word in away if word in sent]))
+                    nc_a += 1
+                    # print "\n"
+    return nc_h, nc_a
+
+
 def savepreprocessdb(tweet_tokenize):
     hashtag_count = 0
     mention_count = 0
@@ -833,6 +826,8 @@ def savepreprocessdb(tweet_tokenize):
         if item.startswith('@'):
             mention_count += 1
 
+    # u"hello\xffworld".encode("ascii", "ignore")
+    # b'helloworld'
     doc = "".join([" " + i.encode('ascii', 'ignore').decode('ascii') if not i.startswith(
         "'") and i not in string.punctuation else i.encode('ascii', 'ignore').decode('ascii')
         for i in tweet_tokenize]).strip()

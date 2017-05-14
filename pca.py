@@ -15,20 +15,16 @@ import numpy as np
 # and the eigenvalues determine their magnitude. In other words, the eigenvalues explain the 
 # variance of the data along the new feature axes.
 
-def perform_pca(df, seq):
+
+def perform_pca(df):
         matplotlib.style.use('ggplot')
         logging.info("\n--------------------Performing dimension reduction of feature vector----------------")
         start_time_pca = time.time()
         pca = PCA().fit(df)
 
-        if seq == 1:
-            exp_var = np.cumsum(np.round(pca.explained_variance_ratio_, decimals=4) * 100)
-            logging.debug("\nExplained variance ratio:{}".format(exp_var))
-            plotpca(exp_var, 'pca_1.png')
-        if seq == 2:
-            exp_var = np.cumsum(np.round(pca.explained_variance_ratio_, decimals=4) * 100)
-            logging.debug("\nExplained variance ratio:{}".format(exp_var))
-            plotpca(exp_var, 'pca_2.png')
+        exp_var = np.cumsum(np.round(pca.explained_variance_ratio_, decimals=4) * 100)
+        logging.debug("\nExplained variance ratio:{}".format(exp_var))
+        plotpca(exp_var, 'pca.png')
         clf = PCA(0.90)  # keep 90% of variance
         x_trans = clf.fit_transform(df)
 
