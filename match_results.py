@@ -52,17 +52,29 @@ def saveResults(finaldf, match, result, model):
 
 
 def rfmodel():
-    rf = RandomForestRegressor(random_state=10, n_estimators=30, max_features='sqrt')
-    df_xtrain = pd.read_csv('data.csv', error_bad_lines=False, header=None)
-    len_col = len(df_xtrain.columns)
-    len_row = df_xtrain.shape[0]
-    df_xtrain = df_xtrain.fillna(df_xtrain.mean())
-    xTrain = df_xtrain.iloc[:len_row - 1, 3:len_col - 1]
-    yTrain = df_xtrain.iloc[:len_row - 1, len_col - 1:]
+    rf = RandomForestRegressor(random_state=10, n_estimators=100)
+    df_train = pd.read_csv('data.csv', error_bad_lines=False, header=None)
+    len_col = len(df_train.columns)
+    len_row = df_train.shape[0]
+    df_train = df_train.iloc[:, 3:]
+    df_train = df_train.fillna(df_train.mean())
+    # std_scale_xtrain = StandardScaler().fit_transform(
+    #     df_train)  # mean = 0 and variance = 1
+    # scaler_xtrain = MinMaxScaler().fit_transform(
+    #     std_scale_xtrain)  # min and max range
+    # scaled_df = pd.DataFrame(data=scaler_xtrain)
+
+    len_col_sdf = len(df_train.columns)
+    len_row_sdf = df_train.shape[0]
+    # training the data frame
+    xTrain = df_train.iloc[:len_row_sdf - 1, 0:len_col_sdf - 1]
+    yTrain = df_train.iloc[:len_row_sdf - 1, len_col_sdf - 1:]
     estimator = rf.fit(xTrain, yTrain.values.ravel())
-    xTest = df_xtrain.tail(1).iloc[:len_row - 1, 3:len_col - 1]
+    # predciting test values
+    xTest = df_train.tail(1).iloc[:len_row_sdf - 1, 0:len_col_sdf - 1]
     y_predict = estimator.predict(xTest)
-    print y_predict
-    score = cross_val_score(estimator, xTrain, yTrain, cv=10).mean()
+
+    print "Prediction: (0-draw, 1-home_win, 2-away_win)", round(y_predict)
+    score = cross_val_score(estimator, xTrain, yTrain.values.ravel(), cv=10).mean()
     print("Score = %.2f" % score)
     sys.exit(1)
