@@ -30,11 +30,11 @@ class Model:
         self._result = 0
 
     def _compute(self, startDate, endDate, model):
-        gettweets(self._posts, self._match, startDate, endDate, seq)
+        # gettweets(self._posts, self._match, startDate, endDate, seq)
         index_id, documents, follower_count, retweet_count, hashtag_count, mention_count, sentiment_pol, favorite_count, \
                           verify_count, screen_name, description = fetchdb(self._posts, self._match, startDate, endDate)
-        gettophashtags(documents, self._match)
-        getstopwords(self._match, self._posts, startDate, endDate)
+        # gettophashtags(documents, self._match)
+        # getstopwords(self._match, self._posts, startDate, endDate)
         df, mergedf, feature_name = get_features(index_id, documents, follower_count, retweet_count,
                                                  hashtag_count, mention_count, sentiment_pol, favorite_count,
                                                  verify_count, screen_name, description)
@@ -45,8 +45,8 @@ class Model:
         saveResults(mergedf, self._match, self._result, model)
 
     def _testData(self):
-        match_date = '05-14-2017'
-        self._match = '#TOTMUN'
+        match_date = '05-18-2017'
+        self._match = '#LEITOT'
         logging.info("\033[92m")
         logging.info("\nComputing tweet count of match: {}".format(self._match))
         logging.debug("\nComputing tweet count of match: {}".format(self._match))
@@ -63,15 +63,33 @@ class Model:
 
     def main(self):
         self._configure()
-        getMatches(self._posts)
-        getallmatchtweets(self._posts)
+        # self._testData()
+        # rfmodel()
+        # sys.exit(1)
+        # getMatches(self._posts)
+        # getallmatchtweets(self._posts)
         found = False
         for line in open('pl.txt'):
             plmatch = line.strip().split(',')[0]
             plmatch = plmatch[1:-1]  # removes quotes
             self._match = plmatch
-            if len(line.strip().split(',')) == 2:
+            if line.strip().split(',')[2] == '':
                     continue
+            if plmatch == '#JuveFCB':
+                mod_mat = plmatch.split('#')
+                home_team = mod_mat[1][0:4].strip()
+                away_team = mod_mat[1][4:].strip()
+            else:
+                mod_mat = plmatch.split('#')
+                home_team = mod_mat[1][0:3].strip()
+                away_team = mod_mat[1][3:].strip()
+            home_tag, away_tag = taglst(home_team, away_team)
+            if len(home_tag) == 0 or len(away_tag) == 0:
+                logging.info("\033[92m")
+                logging.info("Match tag not found for teams.")
+                logging.debug("Match tag not found for teams.")
+                logging.info("\033[0m")
+                continue
             logging.info("\033[92m")
             logging.info("\nComputing tweet count of match: {}".format(self._match))
             logging.debug("\nComputing tweet count of match: {}".format(self._match))
@@ -98,8 +116,6 @@ class Model:
             logging.info("\nStart Date: {} \nEnd Date: {}".format(before_startDate, before_endDate))
             logging.debug("\nStart Date: {} \nEnd Date: {}".format(before_startDate, before_endDate))
             self._compute(before_startDate, before_endDate, "train")            
-        self._testData()
-        rfmodel()
 
 
 if __name__ == '__main__':
